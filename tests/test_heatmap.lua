@@ -41,7 +41,7 @@ T['compute']['returns 2D grid with correct dimensions'] = function()
   MiniTest.expect.equality(child.lua_get('_G._cols'), 20) -- default minimap_width
 end
 
-T['compute']['all levels in range 1..10'] = function()
+T['compute']['all levels in range 0..10'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local lines = {}
@@ -50,7 +50,7 @@ T['compute']['all levels in range 1..10'] = function()
     _G._in_range = true
     for _, row in ipairs(density) do
       for _, v in ipairs(row) do
-        if v < 1 or v > 10 then _G._in_range = false end
+        if v < 0 or v > 10 then _G._in_range = false end
       end
     end
   ]])
@@ -75,16 +75,15 @@ T['compute']['sparse vs dense columns produce different densities'] = function()
   MiniTest.expect.equality(col1 <= col2, true)
 end
 
-T['compute']['empty cells get density 1'] = function()
+T['compute']['empty cells get density 0'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
-    -- Short lines: only first few columns have content, rest are empty
+    -- Short lines: only first column has content, rest are empty
     local lines = { 'hi', 'hi', 'hi', 'hi' }
     local density = hm.compute(lines)
-    -- Last column (col 20) should be empty → density 1
     _G._last_col = density[1][20]
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._last_col'), 1)
+  MiniTest.expect.equality(child.lua_get('_G._last_col'), 0)
 end
 
 T['compute']['uniform content has low variance'] = function()

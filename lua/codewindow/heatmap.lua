@@ -159,14 +159,15 @@ function M.compute(lines)
           parts[#parts + 1] = sub
         end
       end
-      local count = 0
       if #parts > 0 then
         local tokens = tiktoken.encode(table.concat(parts, "\n"))
-        count = #tokens
-      end
-      counts[y][x] = count
-      if count > 0 then
-        nonzero[#nonzero + 1] = count
+        local count = #tokens
+        counts[y][x] = count
+        if count > 0 then
+          nonzero[#nonzero + 1] = count
+        end
+      else
+        counts[y][x] = false
       end
     end
   end
@@ -177,7 +178,7 @@ function M.compute(lines)
     for y = 1, minimap_height do
       density[y] = {}
       for x = 1, minimap_width do
-        density[y][x] = 1
+        density[y][x] = 0
       end
     end
     return density
@@ -201,8 +202,8 @@ function M.compute(lines)
     density[y] = {}
     for x = 1, minimap_width do
       local c = counts[y][x]
-      if c == 0 then
-        density[y][x] = 1
+      if not c or c == 0 then
+        density[y][x] = 0
       elseif range == 0 then
         density[y][x] = 5
       else
