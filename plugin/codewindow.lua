@@ -42,20 +42,23 @@ table.sort(sub_names)
 
 api.nvim_create_user_command("CodeWindow", function(args)
   local parts = vim.split(args.args, "%s+", { trimempty = true })
-  local sub = parts[1] or "toggle"
-  local handler = subcommands[sub]
-  if not handler then
-    vim.notify("CodeWindow: unknown subcommand '" .. sub .. "'", vim.log.levels.ERROR)
-    return
+  local sub = parts[1]
+  local param_start = 2
+
+  if not sub or not subcommands[sub] then
+    sub = "toggle"
+    param_start = 1
   end
 
   local opts = { heatmap = false }
-  for i = 2, #parts do
+  for i = param_start, #parts do
     local k, v = parts[i]:match("^(%w+)=(%w+)$")
     if k == "heatmap" then
       opts.heatmap = v == "true" or v == "1"
     end
   end
+
+  local handler = subcommands[sub]
 
   handler(opts)
 end, {
