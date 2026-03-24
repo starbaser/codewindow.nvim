@@ -9,6 +9,32 @@ local init_failed = false
 local CL100K_PATTERN = "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}"
   .. "| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
 
+local CL100K_URL = "https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken"
+local download_in_progress = false
+
+local CL100K_CACHE_KEY = "9b5ad71b2ce5302211f9c61530b329a4922fc6a4"
+
+local function resolve_cache_dir()
+  local dir = os.getenv("TIKTOKEN_CACHE_DIR")
+  if dir then
+    return dir
+  end
+  dir = os.getenv("DATA_GYM_CACHE_DIR")
+  if dir then
+    return dir
+  end
+  local tmpdir = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
+  return tmpdir .. "/data-gym-cache"
+end
+
+local function resolve_vocab_path(config_path)
+  if config_path then
+    return config_path
+  end
+  local cache_dir = resolve_cache_dir()
+  return cache_dir .. "/" .. CL100K_CACHE_KEY
+end
+
 local heatmap_palette = {
   "#3b4252",
   "#4c566a",
@@ -28,8 +54,56 @@ function M.setup()
   end
 end
 
+local function file_exists(path)
+  local f = io.open(path, "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
+end
+
+local function finish_init(mod, path, special_tokens)
+  local init_ok, err = pcall(mod.new, path, special_tokens or {}, CL100K_PATTERN)
+  if not init_ok then
+    vim.notify("codewindow: tiktoken init failed: " .. tostring(err), vim.log.levels.WARN)
+    init_failed = true
+    return false
+  end
+  tiktoken = mod
+  encoder_ready = true
+  return true
+end
+
+local function download_vocab(path, callback)
+  if download_in_progress then
+    return
+  end
+  download_in_progress = true
+
+  local dir = vim.fn.fnamemodify(path, ":h")
+  vim.fn.mkdir(dir, "p")
+
+  vim.notify("codewindow: downloading tiktoken vocab...", vim.log.levels.INFO)
+
+  vim.system(
+    { "curl", "-sfL", "-o", path, CL100K_URL },
+    {},
+    vim.schedule_wrap(function(result)
+      download_in_progress = false
+      if result.code ~= 0 then
+        vim.notify("codewindow: vocab download failed (curl exit " .. result.code .. ")", vim.log.levels.WARN)
+        init_failed = true
+        return
+      end
+      vim.notify("codewindow: tiktoken vocab downloaded", vim.log.levels.INFO)
+      callback()
+    end)
+  )
+end
+
 local function init_encoder()
-  if init_failed then
+  if init_failed or download_in_progress then
     return false
   end
 
@@ -41,26 +115,16 @@ local function init_encoder()
   end
 
   local config = require("codewindow.config").get()
-  local path = config.heatmap_encoder_path
+  local path = resolve_vocab_path(config.heatmap_encoder_path)
 
-  local f = io.open(path, "r")
-  if not f then
-    vim.notify("codewindow: tiktoken vocab not found at " .. path .. ", heatmap disabled", vim.log.levels.WARN)
-    init_failed = true
-    return false
-  end
-  f:close()
-
-  local init_ok, err = pcall(mod.new, path, config.heatmap_special_tokens or {}, CL100K_PATTERN)
-  if not init_ok then
-    vim.notify("codewindow: tiktoken init failed: " .. tostring(err), vim.log.levels.WARN)
-    init_failed = true
+  if not file_exists(path) then
+    download_vocab(path, function()
+      finish_init(mod, path, config.heatmap_special_tokens)
+    end)
     return false
   end
 
-  tiktoken = mod
-  encoder_ready = true
-  return true
+  return finish_init(mod, path, config.heatmap_special_tokens)
 end
 
 function M.compute(lines)
