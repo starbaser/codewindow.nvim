@@ -156,8 +156,11 @@ function M.apply_highlight(highlights, buffer, lines)
     local density = heatmap.compute(lines)
     if density then
       for y = 1, minimap_height do
-        local level = density[y] or 1
-        api.nvim_buf_add_highlight(buffer, hl_namespace, "CodewindowHeatmap" .. level, y - 1, 6, 6 + minimap_width * 3)
+        for x = 1, minimap_width do
+          local level = density[y][x] or 1
+          local col_start = (x - 1) * 3 + 6
+          api.nvim_buf_add_highlight(buffer, hl_namespace, "CodewindowHeatmap" .. level, y - 1, col_start, col_start + 3)
+        end
       end
     end
   elseif highlights ~= nil then

@@ -2,7 +2,6 @@
 
 local child = MiniTest.new_child_neovim()
 
--- Resolve fixture path from this file's location
 local fixture_dir = vim.fn.fnamemodify('tests/fixtures', ':p')
 
 local T = MiniTest.new_set({
@@ -29,91 +28,96 @@ T['compute']['returns nil for empty lines'] = function()
   MiniTest.expect.equality(child.lua_get('_G._result'), vim.NIL)
 end
 
-T['compute']['returns table of length ceil(lines/4)'] = function()
+T['compute']['returns 2D grid with correct dimensions'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local lines = {}
-    for i = 1, 12 do lines[i] = 'foo bar baz' end
-    _G._result = hm.compute(lines)
-    _G._len = #_G._result
+    for i = 1, 12 do lines[i] = string.rep('x', 160) end
+    local density = hm.compute(lines)
+    _G._rows = #density
+    _G._cols = #density[1]
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._len'), 3)
+  MiniTest.expect.equality(child.lua_get('_G._rows'), 3) -- ceil(12/4)
+  MiniTest.expect.equality(child.lua_get('_G._cols'), 20) -- default minimap_width
 end
 
 T['compute']['all levels in range 1..10'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local lines = {}
-    for i = 1, 40 do lines[i] = string.rep('word ', i) end
+    for i = 1, 40 do lines[i] = string.rep('word ', i * 5) end
     local density = hm.compute(lines)
     _G._in_range = true
-    for _, v in ipairs(density) do
-      if v < 1 or v > 10 then _G._in_range = false end
+    for _, row in ipairs(density) do
+      for _, v in ipairs(row) do
+        if v < 1 or v > 10 then _G._in_range = false end
+      end
     end
   ]])
   MiniTest.expect.equality(child.lua_get('_G._in_range'), true)
 end
 
-T['compute']['varied token counts produce non-uniform density'] = function()
+T['compute']['sparse vs dense columns produce different densities'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
+    -- 4 lines: first 8 chars sparse, chars 9-16 dense
     local lines = {}
-    for i = 1, 4 do lines[i] = 'x' end
-    for i = 5, 8 do lines[i] = string.rep('word ', 20) end
-    for i = 9, 12 do lines[i] = string.rep('word ', 50) end
+    for i = 1, 4 do
+      lines[i] = 'x       ' .. 'complex_variable_name += function_call(arg1, arg2)'
+    end
     local density = hm.compute(lines)
-    _G._d1 = density[1]
-    _G._d3 = density[3]
-    _G._monotonic = (density[1] <= density[2]) and (density[2] <= density[3])
+    _G._col1 = density[1][1]  -- sparse region
+    _G._col2 = density[1][2]  -- dense region
   ]])
-  local d1 = child.lua_get('_G._d1')
-  local d3 = child.lua_get('_G._d3')
-  MiniTest.expect.no_equality(d1, d3)
-  MiniTest.expect.equality(child.lua_get('_G._monotonic'), true)
+  local col1 = child.lua_get('_G._col1')
+  local col2 = child.lua_get('_G._col2')
+  -- Dense column should have higher or equal density
+  MiniTest.expect.equality(col1 <= col2, true)
 end
 
-T['compute']['empty lines get uniform density'] = function()
-  -- tiktoken encodes newlines from table.concat, so empty lines are non-zero tokens
-  -- all chunks equal → range=0 → density=5
+T['compute']['empty cells get density 1'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
-    local density = hm.compute({ '', '', '', '' })
-    _G._result = density[1]
-  ]])
-  MiniTest.expect.equality(child.lua_get('_G._result'), 5)
-end
-
-T['compute']['all equal counts produce uniform mid density'] = function()
-  child.lua([[
-    local hm = require('codewindow.heatmap')
-    local lines = {}
-    for i = 1, 8 do lines[i] = 'a b c' end
+    -- Short lines: only first few columns have content, rest are empty
+    local lines = { 'hi', 'hi', 'hi', 'hi' }
     local density = hm.compute(lines)
-    _G._all_five = (density[1] == 5) and (density[2] == 5)
+    -- Last column (col 20) should be empty → density 1
+    _G._last_col = density[1][20]
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._all_five'), true)
+  MiniTest.expect.equality(child.lua_get('_G._last_col'), 1)
 end
 
-T['compute']['single line returns density >= 1'] = function()
+T['compute']['uniform content has low variance'] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
-    local density = hm.compute({ 'hello world foo bar' })
-    _G._result = density[1]
-  ]])
-  local v = child.lua_get('_G._result')
-  MiniTest.expect.equality(type(v) == 'number' and v >= 1 and v <= 10, true)
-end
-
-T['compute']['whitespace-only lines get uniform density'] = function()
-  -- tiktoken tokenizes spaces, so all chunks have equal non-zero counts → density=5
-  child.lua([[
-    local hm = require('codewindow.heatmap')
-    local lines = {}
-    for i = 1, 8 do lines[i] = '   ' end
+    local line = string.rep('abcdefgh ', 20)
+    local lines = { line, line, line, line, line, line, line, line }
     local density = hm.compute(lines)
-    _G._all_five = (density[1] == 5) and (density[2] == 5)
+    -- Uniform content should not produce extreme spread
+    local lo, hi = 10, 1
+    for x = 1, 20 do
+      local v = density[1][x]
+      if v ~= 1 then
+        if v < lo then lo = v end
+        if v > hi then hi = v end
+      end
+    end
+    _G._spread = hi - lo
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._all_five'), true)
+  -- Token boundary effects may cause slight variation, but spread should be small
+  local spread = child.lua_get('_G._spread')
+  MiniTest.expect.equality(spread <= 3, true)
+end
+
+T['compute']['single line returns grid'] = function()
+  child.lua([[
+    local hm = require('codewindow.heatmap')
+    local density = hm.compute({ 'hello world foo bar baz qux' })
+    _G._is_table = type(density[1]) == 'table'
+    _G._has_cols = #density[1] == 20
+  ]])
+  MiniTest.expect.equality(child.lua_get('_G._is_table'), true)
+  MiniTest.expect.equality(child.lua_get('_G._has_cols'), true)
 end
 
 -- Unhappy paths

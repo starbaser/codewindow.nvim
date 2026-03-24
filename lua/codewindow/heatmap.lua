@@ -132,6 +132,9 @@ function M.compute(lines)
     return nil
   end
 
+  local cfg = require("codewindow.config").get()
+  local minimap_width = cfg.minimap_width
+  local col_span = cfg.width_multiplier * 2
   local minimap_height = math.ceil(#lines / 4)
   if minimap_height == 0 then
     return nil
@@ -141,14 +144,30 @@ function M.compute(lines)
   local nonzero = {}
 
   for y = 1, minimap_height do
+    counts[y] = {}
     local start_line = (y - 1) * 4 + 1
     local end_line = math.min(y * 4, #lines)
-    local chunk = table.concat(lines, "\n", start_line, end_line)
-    local tokens = tiktoken.encode(chunk)
-    local count = #tokens
-    counts[y] = count
-    if count > 0 then
-      table.insert(nonzero, count)
+
+    for x = 1, minimap_width do
+      local col_start = (x - 1) * col_span + 1
+      local col_end = x * col_span
+      local parts = {}
+      for row = start_line, end_line do
+        local line = lines[row] or ""
+        local sub = line:sub(col_start, col_end)
+        if #sub > 0 then
+          parts[#parts + 1] = sub
+        end
+      end
+      local count = 0
+      if #parts > 0 then
+        local tokens = tiktoken.encode(table.concat(parts, "\n"))
+        count = #tokens
+      end
+      counts[y][x] = count
+      if count > 0 then
+        nonzero[#nonzero + 1] = count
+      end
     end
   end
 
@@ -156,7 +175,10 @@ function M.compute(lines)
 
   if #nonzero == 0 then
     for y = 1, minimap_height do
-      density[y] = 1
+      density[y] = {}
+      for x = 1, minimap_width do
+        density[y][x] = 1
+      end
     end
     return density
   end
@@ -176,14 +198,18 @@ function M.compute(lines)
   local range = hi - lo
 
   for y = 1, minimap_height do
-    if counts[y] == 0 then
-      density[y] = 1
-    elseif range == 0 then
-      density[y] = 5
-    else
-      local clamped = math.max(lo, math.min(counts[y], hi))
-      local norm = (clamped - lo) / range
-      density[y] = math.max(1, math.min(10, math.floor(norm * 9) + 1))
+    density[y] = {}
+    for x = 1, minimap_width do
+      local c = counts[y][x]
+      if c == 0 then
+        density[y][x] = 1
+      elseif range == 0 then
+        density[y][x] = 5
+      else
+        local clamped = math.max(lo, math.min(c, hi))
+        local norm = (clamped - lo) / range
+        density[y][x] = math.max(1, math.min(10, math.floor(norm * 9) + 1))
+      end
     end
   end
 
