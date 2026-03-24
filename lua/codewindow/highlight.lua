@@ -27,6 +27,10 @@ function M.setup()
   api.nvim_set_hl(0, "CodewindowDeletion", { fg = "#fc4c4c", default = true })
   api.nvim_set_hl(0, "CodewindowUnderline", { underline = true, sp = "#ffffff", default = true })
   api.nvim_set_hl(0, "CodewindowBoundsBackground", { link = "CursorLine", default = true })
+
+  if config.use_heatmap then
+    require("codewindow.heatmap").setup()
+  end
 end
 
 local function create_hl_namespaces(buffer)
@@ -145,7 +149,23 @@ function M.apply_highlight(highlights, buffer, lines)
 
   create_hl_namespaces(buffer)
 
-  if highlights ~= nil then
+  if config.use_heatmap then
+    local heatmap = require("codewindow.heatmap")
+    local density = heatmap.compute(lines)
+    if density then
+      for y = 1, minimap_height do
+        local level = density[y] or 1
+        api.nvim_buf_add_highlight(
+          buffer,
+          hl_namespace,
+          "CodewindowHeatmap" .. level,
+          y - 1,
+          6,
+          6 + minimap_width * 3
+        )
+      end
+    end
+  elseif highlights ~= nil then
     for y = 1, minimap_height do
       for x = 1, minimap_width do
         for _, group in ipairs(highlights[y][x]) do
