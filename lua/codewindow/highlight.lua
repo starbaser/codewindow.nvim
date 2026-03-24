@@ -3,7 +3,6 @@ local M = {}
 local config = require("codewindow.config").get()
 local utils = require("codewindow.utils")
 local highlighter
-local ts_utils
 
 local hl_namespace
 local screenbounds_namespace
@@ -103,13 +102,17 @@ local function extract_highlighting(buffer, lines)
       if hl then
         local c = query._query.captures[capture]
         if c ~= nil then
-          local start_row, start_col, end_row, end_col =
-            ts_utils.get_vim_range({ vim.treesitter.get_node_range(node) }, buffer)
+          local start_row, start_col, end_row, end_col = vim.treesitter.get_node_range(node)
+          start_row = start_row + 1
+          end_row = end_row + 1
+          start_col = start_col + 1
 
           for y = start_row, end_row do
             for x = start_col, math.min(end_col, minimap_char_width) do
               local minimap_x, minimap_y = utils.buf_to_minimap(x, y)
-              highlights[minimap_y][minimap_x][c] = (highlights[minimap_y][minimap_x][c] or 0) + 1
+              if minimap_y >= 1 and minimap_y <= minimap_height and minimap_x >= 1 and minimap_x <= minimap_width then
+                highlights[minimap_y][minimap_x][c] = (highlights[minimap_y][minimap_x][c] or 0) + 1
+              end
             end
           end
         end
@@ -128,7 +131,6 @@ end
 
 if config.use_treesitter then
   highlighter = require("vim.treesitter.highlighter")
-  ts_utils = require("nvim-treesitter.ts_utils")
   M.extract_highlighting = extract_highlighting
 else
   M.extract_highlighting = function() end
@@ -155,14 +157,7 @@ function M.apply_highlight(highlights, buffer, lines)
     if density then
       for y = 1, minimap_height do
         local level = density[y] or 1
-        api.nvim_buf_add_highlight(
-          buffer,
-          hl_namespace,
-          "CodewindowHeatmap" .. level,
-          y - 1,
-          6,
-          6 + minimap_width * 3
-        )
+        api.nvim_buf_add_highlight(buffer, hl_namespace, "CodewindowHeatmap" .. level, y - 1, 6, 6 + minimap_width * 3)
       end
     end
   elseif highlights ~= nil then

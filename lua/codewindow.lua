@@ -1,8 +1,8 @@
 local M = {}
 
-local minimap_txt = require('codewindow.text')
-local minimap_win = require('codewindow.window')
-local minimap_hl  = require('codewindow.highlight')
+local minimap_txt = require("codewindow.text")
+local minimap_win = require("codewindow.window")
+local minimap_hl = require("codewindow.highlight")
 
 local defer = vim.schedule
 local api = vim.api
@@ -46,22 +46,67 @@ function M.toggle_minimap()
 end
 
 function M.apply_default_keybinds()
-  vim.keymap.set('n', '<leader>mo', M.open_minimap, { desc = 'Open minimap' })
-  vim.keymap.set('n', '<leader>mf', M.toggle_focus, { desc = 'Toggle minimap focus' })
-  vim.keymap.set('n', '<leader>mc', M.close_minimap, { desc = 'Close minimap' })
-  vim.keymap.set('n', '<leader>mm', M.toggle_minimap, { desc = 'Toggle minimap' })
+  vim.keymap.set("n", "<leader>mo", M.open_minimap, { desc = "Open minimap" })
+  vim.keymap.set("n", "<leader>mf", M.toggle_focus, { desc = "Toggle minimap focus" })
+  vim.keymap.set("n", "<leader>mc", M.close_minimap, { desc = "Close minimap" })
+  vim.keymap.set("n", "<leader>mm", M.toggle_minimap, { desc = "Toggle minimap" })
 end
 
 function M.setup(config)
-  config = require('codewindow.config').setup(config)
+  config = require("codewindow.config").setup(config)
 
   minimap_hl.setup()
 
-  api.nvim_create_autocmd({ 'BufEnter', 'WinEnter' }, {
+  api.nvim_create_user_command("CodeWindowOpen", function()
+    M.open_minimap()
+  end, {})
+  api.nvim_create_user_command("CodeWindowClose", function()
+    M.close_minimap()
+  end, {})
+  api.nvim_create_user_command("CodeWindowToggle", function()
+    M.toggle_minimap()
+  end, {})
+
+  api.nvim_create_user_command("TokenHeatMapOpen", function()
+    config.use_heatmap = true
+    if not minimap_win.is_minimap_open() then
+      M.open_minimap()
+    else
+      local current_buffer = api.nvim_get_current_buf()
+      local window = minimap_win.get_minimap_window()
+      if window then
+        minimap_txt.update_minimap(current_buffer, window)
+      end
+    end
+  end, {})
+
+  api.nvim_create_user_command("TokenHeatMapClose", function()
+    config.use_heatmap = false
+    if minimap_win.is_minimap_open() then
+      local current_buffer = api.nvim_get_current_buf()
+      local window = minimap_win.get_minimap_window()
+      if window then
+        minimap_txt.update_minimap(current_buffer, window)
+      end
+    end
+  end, {})
+
+  api.nvim_create_user_command("TokenHeatMapToggle", function()
+    config.use_heatmap = not config.use_heatmap
+    if minimap_win.is_minimap_open() then
+      local current_buffer = api.nvim_get_current_buf()
+      local window = minimap_win.get_minimap_window()
+      if window then
+        minimap_txt.update_minimap(current_buffer, window)
+      end
+    end
+  end, {})
+
+  api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
     callback = function()
       local filetype = vim.bo.filetype
       local should_open = false
-      if type(config.auto_enable) == 'boolean' then
+      if type(config.auto_enable) == "boolean" then
         should_open = config.auto_enable
       else
         for _, v in ipairs(config.auto_enable) do
@@ -77,14 +122,14 @@ function M.setup(config)
         end
       end
 
-      if vim.bo.buftype == 'terminal' and not config.active_in_terminals then
+      if vim.bo.buftype == "terminal" and not config.active_in_terminals then
         return
       end
 
       if should_open then
         defer(M.open_minimap)
       end
-    end
+    end,
   })
 end
 
