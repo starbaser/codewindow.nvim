@@ -57,51 +57,6 @@ function M.setup(config)
 
   minimap_hl.setup()
 
-  api.nvim_create_user_command("CodeWindowOpen", function()
-    M.open_minimap()
-  end, {})
-  api.nvim_create_user_command("CodeWindowClose", function()
-    M.close_minimap()
-  end, {})
-  api.nvim_create_user_command("CodeWindowToggle", function()
-    M.toggle_minimap()
-  end, {})
-
-  api.nvim_create_user_command("TokenHeatMapOpen", function()
-    config.use_heatmap = true
-    if not minimap_win.is_minimap_open() then
-      M.open_minimap()
-    else
-      local current_buffer = api.nvim_get_current_buf()
-      local window = minimap_win.get_minimap_window()
-      if window then
-        minimap_txt.update_minimap(current_buffer, window)
-      end
-    end
-  end, {})
-
-  api.nvim_create_user_command("TokenHeatMapClose", function()
-    config.use_heatmap = false
-    if minimap_win.is_minimap_open() then
-      local current_buffer = api.nvim_get_current_buf()
-      local window = minimap_win.get_minimap_window()
-      if window then
-        minimap_txt.update_minimap(current_buffer, window)
-      end
-    end
-  end, {})
-
-  api.nvim_create_user_command("TokenHeatMapToggle", function()
-    config.use_heatmap = not config.use_heatmap
-    if minimap_win.is_minimap_open() then
-      local current_buffer = api.nvim_get_current_buf()
-      local window = minimap_win.get_minimap_window()
-      if window then
-        minimap_txt.update_minimap(current_buffer, window)
-      end
-    end
-  end, {})
-
   api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
     callback = function()
       local filetype = vim.bo.filetype
