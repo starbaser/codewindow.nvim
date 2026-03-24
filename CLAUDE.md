@@ -6,12 +6,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 codewindow.nvim is a Neovim minimap plugin that renders buffer content as braille characters in a floating window, with treesitter syntax highlighting, LSP diagnostic indicators, and git diff markers.
 
+## Build & Run
+
+```sh
+nix build .        # Build vimPlugin derivation
+nix flake check    # Run smoke test + mini.test suite in Nix sandbox
+```
+
 ## Development
 
 - **Language**: Lua (Neovim plugin, no build step)
-- **Formatter**: StyLua (config in `.stylua.toml` — indent: tabs, width: 120, collapse simple statements: never)
-- **No tests or CI** — manual testing in Neovim
+- **Formatter**: StyLua (config in `.stylua.toml` — indent: spaces, width: 2)
 - **Linting**: `stylua --check lua/` to verify formatting; `stylua lua/` to fix
+- **DevShell**: `testNvim` (neovim + mini.test + treesitter + tiktoken_core), `watchexec`, `stylua`
+
+## Testing
+
+Framework: mini.test. Tests run in headless Neovim via `just test`.
+
+```sh
+just test                              # All tests
+just test-file tests/test_heatmap.lua  # Single file
+just watch                             # Watch mode
+```
+
+### Test Fixtures
+
+`tests/fixtures/` contains the cl100k_base tiktoken vocabulary file (1.6MB, keyed by SHA1 `9b5ad71b2ce5302211f9c61530b329a4922fc6a4`). This is used by heatmap tests so the real `tiktoken_core` encoder can initialize without network access. The `pre_case` hook sets `TIKTOKEN_CACHE_DIR` to the fixture directory.
+
+To regenerate the fixture if the cache key changes in `heatmap.lua`:
+```sh
+cp /tmp/data-gym-cache/<new_cache_key> tests/fixtures/<new_cache_key>
+```
+
+### Test Files
+
+| File | Module | Tests | Type |
+|------|--------|-------|------|
+| `test_config.lua` | `codewindow.config` | 6 | Unit (same process) |
+| `test_utils.lua` | `codewindow.utils` | 9 | Unit (same process, stubbed config) |
+| `test_heatmap.lua` | `codewindow.heatmap` | 11 | Integration (child nvim, real tiktoken) |
+| `test_text.lua` | `codewindow.text` | 2 | Integration (child nvim, stubbed deps) |
+
+### Test Protocol
+
+- New Lua modules SHOULD have corresponding `tests/test_<module>.lua`
+- Tests needing external modules mock them via `package.loaded` injection before `require`
+- Use `child.lua([[...]])` for setup/execution, `child.lua_get('_G._result')` to retrieve values
+- Reset module state between tests: `package.loaded['codewindow.<mod>'] = nil` in `pre_case`
 
 ## Architecture
 

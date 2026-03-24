@@ -3,7 +3,7 @@
 local child = MiniTest.new_child_neovim()
 
 -- Resolve fixture path from this file's location
-local fixture_dir = vim.fn.fnamemodify(vim.fn.expand('<sfile>'), ':p:h') .. '/fixtures'
+local fixture_dir = vim.fn.fnamemodify('tests/fixtures', ':p')
 
 local T = MiniTest.new_set({
   hooks = {
