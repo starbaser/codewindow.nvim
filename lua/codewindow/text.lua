@@ -93,11 +93,29 @@ function M.update_minimap(current_buffer, window)
   end
 
   local ruler_text = minimap_ruler.render(lines, window)
+  local ruler_gap = string.rep(" ", utils.ruler_gap_width())
+  local ruler_side = utils.ruler_side()
   for i = 1, #minimap_text do
+    local left_ruler = ""
+    local right_ruler = ""
+    local left_gap = ""
+    local right_gap = ""
+
+    if ruler_side == "left" and ruler_text[i] then
+      left_ruler = ruler_text[i]
+      left_gap = ruler_gap
+    elseif ruler_side == "right" and ruler_text[i] then
+      right_gap = ruler_gap
+      right_ruler = ruler_text[i]
+    end
+
     local line = (error_text[i] or placeholder_str)
-      .. (ruler_text[i] or "")
+      .. left_ruler
+      .. left_gap
       .. minimap_text[i]
       .. (git_text[i] or placeholder_str)
+      .. right_gap
+      .. right_ruler
     text[i] = line
   end
 

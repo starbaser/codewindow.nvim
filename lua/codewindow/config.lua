@@ -20,8 +20,11 @@ local config = {
   window_border = "single",
   relative = "win",
   show_ruler = true,
-  ruler_width = 4,
+  ruler_side = "right",
+  ruler_width = 3,
+  ruler_gap = 1,
   ruler_interval = nil,
+  ruler_tick_interval = nil,
   events = { "TextChanged", "InsertLeave", "DiagnosticChanged", "FileWritePost" },
 }
 

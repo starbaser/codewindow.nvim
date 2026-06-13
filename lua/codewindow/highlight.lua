@@ -205,9 +205,10 @@ function M.apply_highlight(highlights, buffer, lines)
     api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowError", y - 1, 0, 3)
     api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowWarn", y - 1, 3, 6)
 
-    local ruler_width = utils.ruler_width()
-    if ruler_width > 0 then
-      api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowRuler", y - 1, 6, 6 + ruler_width)
+    local ruler_start = utils.ruler_start_byte()
+    local ruler_end = utils.ruler_end_byte()
+    if ruler_start and ruler_end then
+      api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowRuler", y - 1, ruler_start, ruler_end)
     end
 
     local git_start = utils.git_start_byte()

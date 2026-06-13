@@ -1,7 +1,6 @@
 local codewindow = require("codewindow")
 local minimap_txt = require("codewindow.text")
 local minimap_win = require("codewindow.window")
-local highlight = require("codewindow.highlight")
 
 local api = vim.api
 
@@ -40,8 +39,8 @@ local subcommands = {
 local sub_names = vim.tbl_keys(subcommands)
 table.sort(sub_names)
 
-api.nvim_create_user_command("CodeWindow", function(args)
-  local parts = vim.split(args.args, "%s+", { trimempty = true })
+local function run_command(raw_args, default_heatmap, force_heatmap)
+  local parts = vim.split(raw_args, "%s+", { trimempty = true })
   local sub = parts[1]
   local param_start = 2
 
@@ -50,26 +49,49 @@ api.nvim_create_user_command("CodeWindow", function(args)
     param_start = 1
   end
 
-  local opts = { heatmap = false }
+  local opts = { heatmap = default_heatmap }
   for i = param_start, #parts do
     local k, v = parts[i]:match("^(%w+)=(%w+)$")
     if k == "heatmap" then
       opts.heatmap = v == "true" or v == "1"
     end
   end
+  if force_heatmap then
+    opts.heatmap = true
+  end
 
   local handler = subcommands[sub]
 
   handler(opts)
+end
+
+local function complete_command(lead, line, include_options)
+  local parts = vim.split(line, "%s+", { trimempty = true })
+  if #parts <= 2 and not line:match("%s$") then
+    return vim.tbl_filter(function(s)
+      return s:find(lead, 1, true) == 1
+    end, sub_names)
+  end
+  if include_options then
+    return { "heatmap=true", "heatmap=false" }
+  end
+  return {}
+end
+
+api.nvim_create_user_command("CodeWindow", function(args)
+  run_command(args.args, false, false)
 end, {
   nargs = "*",
   complete = function(lead, line)
-    local parts = vim.split(line, "%s+", { trimempty = true })
-    if #parts <= 2 and not line:match("%s$") then
-      return vim.tbl_filter(function(s)
-        return s:find(lead, 1, true) == 1
-      end, sub_names)
-    end
-    return { "heatmap=true", "heatmap=false" }
+    return complete_command(lead, line, true)
+  end,
+})
+
+api.nvim_create_user_command("TokenMap", function(args)
+  run_command(args.args, true, true)
+end, {
+  nargs = "*",
+  complete = function(lead, line)
+    return complete_command(lead, line, false)
   end,
 })

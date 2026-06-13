@@ -21,8 +21,44 @@ function M.ruler_width()
   return math.max(0, math.floor(width))
 end
 
+function M.ruler_side()
+  local config = require("codewindow.config").get()
+  if config.ruler_side == "left" then
+    return "left"
+  end
+  return "right"
+end
+
+function M.ruler_gap_width()
+  if M.ruler_width() == 0 then
+    return 0
+  end
+
+  local config = require("codewindow.config").get()
+  local width = tonumber(config.ruler_gap) or 0
+  return math.max(0, math.floor(width))
+end
+
+function M.left_ruler_width()
+  if M.ruler_side() ~= "left" then
+    return 0
+  end
+  return M.ruler_width()
+end
+
+function M.right_ruler_width()
+  if M.ruler_side() ~= "right" then
+    return 0
+  end
+  return M.ruler_width()
+end
+
 function M.content_start_byte()
-  return 6 + M.ruler_width()
+  local left_ruler = M.left_ruler_width()
+  if left_ruler == 0 then
+    return 6
+  end
+  return 6 + left_ruler + M.ruler_gap_width()
 end
 
 function M.content_end_byte()
@@ -42,9 +78,34 @@ function M.git_start_byte()
   return M.content_end_byte()
 end
 
+function M.git_end_byte()
+  return M.git_start_byte() + 6
+end
+
+function M.ruler_start_byte()
+  local width = M.ruler_width()
+  if width == 0 then
+    return nil
+  end
+
+  if M.ruler_side() == "left" then
+    return 6
+  end
+
+  return M.git_end_byte() + M.ruler_gap_width()
+end
+
+function M.ruler_end_byte()
+  local start = M.ruler_start_byte()
+  if start == nil then
+    return nil
+  end
+  return start + M.ruler_width()
+end
+
 function M.window_width()
   local config = require("codewindow.config").get()
-  return config.minimap_width + 4 + M.ruler_width()
+  return config.minimap_width + 4 + M.ruler_width() + M.ruler_gap_width()
 end
 
 local braille_chars = "⠀⠁⠂⠃⠄⠅⠆⠇⡀⡁⡂⡃⡄⡅⡆⡇⠈⠉⠊⠋⠌⠍⠎⠏⡈⡉⡊⡋⡌⡍⡎⡏"

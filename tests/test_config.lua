@@ -18,8 +18,11 @@ T["get"]["returns defaults on fresh load"] = function()
   MiniTest.expect.equality(c.use_lsp, true)
   MiniTest.expect.equality(c.use_git, true)
   MiniTest.expect.equality(c.show_ruler, true)
-  MiniTest.expect.equality(c.ruler_width, 4)
+  MiniTest.expect.equality(c.ruler_side, "right")
+  MiniTest.expect.equality(c.ruler_width, 3)
+  MiniTest.expect.equality(c.ruler_gap, 1)
   MiniTest.expect.equality(c.ruler_interval == nil, true)
+  MiniTest.expect.equality(c.ruler_tick_interval == nil, true)
 end
 
 T["get"]["returns same table by reference"] = function()

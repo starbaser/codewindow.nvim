@@ -85,7 +85,9 @@ T["update_minimap"]["writes ruler labels in reserved gutter"] = function()
   child.lua([[
     require('codewindow.config').setup({
       minimap_width = 2,
-      ruler_width = 4,
+      ruler_width = 3,
+      ruler_gap = 1,
+      ruler_side = 'right',
       ruler_interval = 4,
       show_ruler = true,
       use_lsp = false,
@@ -109,11 +111,11 @@ T["update_minimap"]["writes ruler labels in reserved gutter"] = function()
 
     require('codewindow.text').update_minimap(src_buf, fake_window)
     local line = vim.api.nvim_buf_get_lines(mm_buf, 0, 1, true)[1]
-    _G._ruler = line:sub(7, 10)
+    _G._ruler = line:sub(-3)
     _G._display_width = vim.fn.strdisplaywidth(line)
   ]])
 
-  MiniTest.expect.equality(child.lua_get("_G._ruler"), "   4")
+  MiniTest.expect.equality(child.lua_get("_G._ruler"), "  4")
   MiniTest.expect.equality(child.lua_get("_G._display_width"), 10)
 end
 

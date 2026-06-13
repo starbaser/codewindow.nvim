@@ -52,6 +52,16 @@ local function get_interval(window)
   return math.max(10, math.ceil(height / 10) * 10)
 end
 
+local function get_tick_interval(interval)
+  local config = require("codewindow.config").get()
+  local explicit_interval = tonumber(config.ruler_tick_interval)
+  if explicit_interval and explicit_interval > 0 then
+    return math.floor(explicit_interval)
+  end
+
+  return math.max(4, math.floor(interval / 2))
+end
+
 function M.render(lines, window)
   local utils = require("codewindow.utils")
   local width = utils.ruler_width()
@@ -73,6 +83,16 @@ function M.render(lines, window)
   ruler[1] = compact_number(1, width)
 
   local interval = get_interval(window)
+  local tick_interval = get_tick_interval(interval)
+  local tick = left_pad(".", width)
+
+  for line = tick_interval, #lines, tick_interval do
+    if line % interval ~= 0 then
+      local row = math.ceil(line / 4)
+      ruler[row] = tick
+    end
+  end
+
   for line = interval, #lines, interval do
     local row = math.ceil(line / 4)
     ruler[row] = compact_number(line, width)

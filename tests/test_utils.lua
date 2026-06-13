@@ -9,7 +9,9 @@ local function fresh_utils(overrides)
     width_multiplier = 4,
     minimap_width = 20,
     show_ruler = true,
-    ruler_width = 4,
+    ruler_side = "right",
+    ruler_width = 3,
+    ruler_gap = 1,
   }
   for key, value in pairs(overrides or {}) do
     config[key] = value
@@ -90,10 +92,19 @@ T["layout"]["ruler can be disabled"] = function()
 end
 
 T["layout"]["content starts after diagnostics and ruler"] = function()
-  local current_utils = fresh_utils({ ruler_width = 3 })
-  MiniTest.expect.equality(current_utils.content_start_byte(), 9)
-  MiniTest.expect.equality(current_utils.minimap_col_start_byte(2), 12)
-  MiniTest.expect.equality(current_utils.git_start_byte(), 69)
+  local current_utils = fresh_utils({ ruler_side = "left", ruler_width = 3, ruler_gap = 1 })
+  MiniTest.expect.equality(current_utils.content_start_byte(), 10)
+  MiniTest.expect.equality(current_utils.minimap_col_start_byte(2), 13)
+  MiniTest.expect.equality(current_utils.git_start_byte(), 70)
+  MiniTest.expect.equality(current_utils.ruler_start_byte(), 6)
+end
+
+T["layout"]["right ruler does not shift minimap content"] = function()
+  local current_utils = fresh_utils({ ruler_width = 3, ruler_gap = 1 })
+  MiniTest.expect.equality(current_utils.content_start_byte(), 6)
+  MiniTest.expect.equality(current_utils.minimap_col_start_byte(2), 9)
+  MiniTest.expect.equality(current_utils.git_start_byte(), 66)
+  MiniTest.expect.equality(current_utils.ruler_start_byte(), 73)
 end
 
 return T

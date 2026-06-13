@@ -27,7 +27,7 @@ T["render"] = MiniTest.new_set()
 T["render"]["labels first line and configured intervals"] = function()
   local ruler = fresh_ruler({
     show_ruler = true,
-    ruler_width = 4,
+    ruler_width = 3,
     ruler_interval = 10,
     width_multiplier = 4,
     minimap_width = 20,
@@ -36,10 +36,11 @@ T["render"]["labels first line and configured intervals"] = function()
   local result = ruler.render(source_lines(25))
 
   MiniTest.expect.equality(#result, 7)
-  MiniTest.expect.equality(result[1], "   1")
-  MiniTest.expect.equality(result[2], "    ")
-  MiniTest.expect.equality(result[3], "  10")
-  MiniTest.expect.equality(result[5], "  20")
+  MiniTest.expect.equality(result[1], "  1")
+  MiniTest.expect.equality(result[2], "  .")
+  MiniTest.expect.equality(result[3], " 10")
+  MiniTest.expect.equality(result[4], "  .")
+  MiniTest.expect.equality(result[5], " 20")
 end
 
 T["render"]["returns no gutter text when disabled"] = function()
@@ -66,6 +67,23 @@ T["render"]["compacts large line numbers inside the gutter"] = function()
   local result = ruler.render(source_lines(1000))
 
   MiniTest.expect.equality(result[250], " 1k")
+end
+
+T["render"]["uses configured tick intervals"] = function()
+  local ruler = fresh_ruler({
+    show_ruler = true,
+    ruler_width = 3,
+    ruler_interval = 30,
+    ruler_tick_interval = 10,
+    width_multiplier = 4,
+    minimap_width = 20,
+  })
+
+  local result = ruler.render(source_lines(40))
+
+  MiniTest.expect.equality(result[3], "  .")
+  MiniTest.expect.equality(result[5], "  .")
+  MiniTest.expect.equality(result[8], " 30")
 end
 
 return T
