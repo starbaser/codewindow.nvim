@@ -100,9 +100,9 @@ T["render"]["keeps shortened large labels unique"] = function()
 
   local result = ruler.render(source_lines(2100))
 
-  MiniTest.expect.equality(result[504], "2k0")
-  MiniTest.expect.equality(result[512], "2k1")
-  MiniTest.expect.equality(result[520], "2k2")
+  MiniTest.expect.equality(result[504], "2.02k")
+  MiniTest.expect.equality(result[512], "2.05k")
+  MiniTest.expect.equality(result[520], "2.08k")
 end
 
 T["render"]["uses configured tick intervals"] = function()

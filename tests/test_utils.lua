@@ -85,6 +85,14 @@ T["layout"]["window width includes ruler width"] = function()
   MiniTest.expect.equality(current_utils.window_width(), 28)
 end
 
+T["layout"]["window width grows with resolved ruler width"] = function()
+  local current_utils = fresh_utils()
+  current_utils.set_resolved_ruler_width(5)
+  MiniTest.expect.equality(current_utils.ruler_width(), 5)
+  MiniTest.expect.equality(current_utils.window_width(), 30)
+  MiniTest.expect.equality(current_utils.ruler_end_byte(), 78)
+end
+
 T["layout"]["ruler can be disabled"] = function()
   local current_utils = fresh_utils({ show_ruler = false })
   MiniTest.expect.equality(current_utils.ruler_width(), 0)

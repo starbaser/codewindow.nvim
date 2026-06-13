@@ -3,6 +3,7 @@ local M = {}
 local get_line = vim.fn.line
 local exe = vim.cmd.execute
 local api = vim.api
+local resolved_ruler_width = 0
 
 function M.buf_to_minimap(x, y)
   local config = require("codewindow.config").get()
@@ -11,7 +12,7 @@ function M.buf_to_minimap(x, y)
   return minimap_x, minimap_y
 end
 
-function M.ruler_width()
+function M.ruler_min_width()
   local config = require("codewindow.config").get()
   if config.show_ruler == false then
     return 0
@@ -19,6 +20,18 @@ function M.ruler_width()
 
   local width = tonumber(config.ruler_width) or 0
   return math.max(0, math.floor(width))
+end
+
+function M.set_resolved_ruler_width(width)
+  resolved_ruler_width = math.max(0, math.floor(tonumber(width) or 0))
+end
+
+function M.ruler_width()
+  local min_width = M.ruler_min_width()
+  if min_width == 0 then
+    return 0
+  end
+  return math.max(min_width, resolved_ruler_width)
 end
 
 function M.ruler_side()

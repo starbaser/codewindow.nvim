@@ -9,6 +9,20 @@ local api = vim.api
 
 local tab2chars = string.rep(" ", vim.opt.tabstop:get())
 
+local function resize_minimap_window(window)
+  if not window or not api.nvim_win_is_valid(window.window or -1) then
+    return
+  end
+
+  local ok, win_config = pcall(api.nvim_win_get_config, window.window)
+  if not ok or win_config.relative == "" then
+    return
+  end
+
+  win_config.width = utils.window_width()
+  pcall(api.nvim_win_set_config, window.window, win_config)
+end
+
 local function is_whitespace(chr)
   return chr == " " or chr == "\t" or chr == ""
 end
@@ -93,6 +107,7 @@ function M.update_minimap(current_buffer, window)
   end
 
   local ruler_text = minimap_ruler.render(lines, window)
+  resize_minimap_window(window)
   local ruler_gap = string.rep(" ", utils.ruler_gap_width())
   local ruler_side = utils.ruler_side()
   for i = 1, #minimap_text do
