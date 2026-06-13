@@ -89,6 +89,22 @@ T["render"]["compacts large line numbers inside the gutter"] = function()
   MiniTest.expect.equality(result[250], " 1k")
 end
 
+T["render"]["keeps shortened large labels unique"] = function()
+  local ruler = fresh_ruler({
+    show_ruler = true,
+    ruler_width = 3,
+    ruler_interval = 32,
+    width_multiplier = 4,
+    minimap_width = 20,
+  })
+
+  local result = ruler.render(source_lines(2100))
+
+  MiniTest.expect.equality(result[504], "2k0")
+  MiniTest.expect.equality(result[512], "2k1")
+  MiniTest.expect.equality(result[520], "2k2")
+end
+
 T["render"]["uses configured tick intervals"] = function()
   local ruler = fresh_ruler({
     show_ruler = true,
