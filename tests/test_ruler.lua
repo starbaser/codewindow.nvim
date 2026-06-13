@@ -43,6 +43,26 @@ T["render"]["labels first line and configured intervals"] = function()
   MiniTest.expect.equality(result[5], " 20")
 end
 
+T["render"]["automatic intervals leave a centered midpoint row"] = function()
+  local old_lines = vim.o.lines
+  vim.o.lines = 24
+  local ruler = fresh_ruler({
+    show_ruler = true,
+    ruler_width = 3,
+    ruler_interval = nil,
+    width_multiplier = 4,
+    minimap_width = 20,
+  })
+
+  local result = ruler.render(source_lines(70))
+  vim.o.lines = old_lines
+
+  MiniTest.expect.equality(result[4], "  .")
+  MiniTest.expect.equality(result[8], " 32")
+  MiniTest.expect.equality(result[12], "  .")
+  MiniTest.expect.equality(result[16], " 64")
+end
+
 T["render"]["returns no gutter text when disabled"] = function()
   local ruler = fresh_ruler({
     show_ruler = false,

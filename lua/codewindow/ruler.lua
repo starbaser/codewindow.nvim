@@ -41,6 +41,14 @@ local function get_parent_height(window)
   return vim.o.lines
 end
 
+local function centerable_interval(raw_interval)
+  local row_interval = math.max(2, math.ceil(raw_interval / 4))
+  if row_interval % 2 == 1 then
+    row_interval = row_interval + 1
+  end
+  return row_interval * 4
+end
+
 local function get_interval(window)
   local config = require("codewindow.config").get()
   local explicit_interval = tonumber(config.ruler_interval)
@@ -49,7 +57,7 @@ local function get_interval(window)
   end
 
   local height = math.max(1, get_parent_height(window))
-  return math.max(10, math.ceil(height / 10) * 10)
+  return centerable_interval(math.max(10, math.ceil(height / 10) * 10))
 end
 
 local function get_tick_interval(interval)
