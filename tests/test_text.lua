@@ -5,13 +5,14 @@ local child = MiniTest.new_child_neovim()
 local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
-      child.restart({ '-u', 'tests/minimal_init.lua' })
+      child.restart({ "-u", "tests/minimal_init.lua" })
       child.lua([[
         package.loaded['codewindow.config'] = nil
         package.loaded['codewindow.utils'] = nil
         package.loaded['codewindow.highlight'] = nil
         package.loaded['codewindow.errors'] = nil
         package.loaded['codewindow.git'] = nil
+        package.loaded['codewindow.ruler'] = nil
         package.loaded['codewindow.text'] = nil
 
         package.loaded['codewindow.highlight'] = {
@@ -33,9 +34,9 @@ local T = MiniTest.new_set({
   },
 })
 
-T['update_minimap'] = MiniTest.new_set()
+T["update_minimap"] = MiniTest.new_set()
 
-T['update_minimap']['writes correct number of lines'] = function()
+T["update_minimap"]["writes correct number of lines"] = function()
   child.lua([[
     local src_buf = vim.api.nvim_create_buf(false, true)
     local src_lines = {}
@@ -54,10 +55,10 @@ T['update_minimap']['writes correct number of lines'] = function()
     require('codewindow.text').update_minimap(src_buf, fake_window)
     _G._line_count = vim.api.nvim_buf_line_count(mm_buf)
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._line_count'), 2)
+  MiniTest.expect.equality(child.lua_get("_G._line_count"), 2)
 end
 
-T['update_minimap']['non-whitespace produces non-blank braille'] = function()
+T["update_minimap"]["non-whitespace produces non-blank braille"] = function()
   child.lua([[
     local src_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(src_buf, 0, -1, true, {
@@ -77,7 +78,43 @@ T['update_minimap']['non-whitespace produces non-blank braille'] = function()
     local lines = vim.api.nvim_buf_get_lines(mm_buf, 0, -1, true)
     _G._has_content = lines[1] ~= nil and #lines[1] > 0
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._has_content'), true)
+  MiniTest.expect.equality(child.lua_get("_G._has_content"), true)
+end
+
+T["update_minimap"]["writes ruler labels in reserved gutter"] = function()
+  child.lua([[
+    require('codewindow.config').setup({
+      minimap_width = 2,
+      ruler_width = 4,
+      ruler_interval = 4,
+      show_ruler = true,
+      use_lsp = false,
+      use_git = false,
+    })
+
+    local src_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(src_buf, 0, -1, true, {
+      'first',
+      'second',
+      'third',
+      'fourth',
+    })
+    local mm_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_option_value('modifiable', true, { buf = mm_buf })
+    local fake_window = {
+      buffer = mm_buf,
+      window = vim.api.nvim_get_current_win(),
+      parent_win = vim.api.nvim_get_current_win(),
+    }
+
+    require('codewindow.text').update_minimap(src_buf, fake_window)
+    local line = vim.api.nvim_buf_get_lines(mm_buf, 0, 1, true)[1]
+    _G._ruler = line:sub(7, 10)
+    _G._display_width = vim.fn.strdisplaywidth(line)
+  ]])
+
+  MiniTest.expect.equality(child.lua_get("_G._ruler"), "   4")
+  MiniTest.expect.equality(child.lua_get("_G._display_width"), 10)
 end
 
 return T

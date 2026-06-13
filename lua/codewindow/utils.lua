@@ -5,21 +5,56 @@ local exe = vim.cmd.execute
 local api = vim.api
 
 function M.buf_to_minimap(x, y)
-  local config = require('codewindow.config').get()
+  local config = require("codewindow.config").get()
   local minimap_x = math.floor((x - 1) / config.width_multiplier / 2) + 1
   local minimap_y = math.floor((y - 1) / 4) + 1
   return minimap_x, minimap_y
 end
 
+function M.ruler_width()
+  local config = require("codewindow.config").get()
+  if config.show_ruler == false then
+    return 0
+  end
+
+  local width = tonumber(config.ruler_width) or 0
+  return math.max(0, math.floor(width))
+end
+
+function M.content_start_byte()
+  return 6 + M.ruler_width()
+end
+
+function M.content_end_byte()
+  local config = require("codewindow.config").get()
+  return M.content_start_byte() + config.minimap_width * 3
+end
+
+function M.minimap_col_start_byte(x)
+  return M.content_start_byte() + (x - 1) * 3
+end
+
+function M.minimap_col_end_byte(x)
+  return M.content_start_byte() + x * 3
+end
+
+function M.git_start_byte()
+  return M.content_end_byte()
+end
+
+function M.window_width()
+  local config = require("codewindow.config").get()
+  return config.minimap_width + 4 + M.ruler_width()
+end
+
 local braille_chars = "⠀⠁⠂⠃⠄⠅⠆⠇⡀⡁⡂⡃⡄⡅⡆⡇⠈⠉⠊⠋⠌⠍⠎⠏⡈⡉⡊⡋⡌⡍⡎⡏"
-    ..
-    "⠐⠑⠒⠓⠔⠕⠖⠗⡐⡑⡒⡓⡔⡕⡖⡗⠘⠙⠚⠛⠜⠝⠞⠟⡘⡙⡚⡛⡜⡝⡞⡟" ..
-    "⠠⠡⠢⠣⠤⠥⠦⠧⡠⡡⡢⡣⡤⡥⡦⡧⠨⠩⠪⠫⠬⠭⠮⠯⡨⡩⡪⡫⡬⡭⡮⡯" ..
-    "⠰⠱⠲⠳⠴⠵⠶⠷⡰⡱⡲⡳⡴⡵⡶⡷⠸⠹⠺⠻⠼⠽⠾⠿⡸⡹⡺⡻⡼⡽⡾⡿" ..
-    "⢀⢁⢂⢃⢄⢅⢆⢇⣀⣁⣂⣃⣄⣅⣆⣇⢈⢉⢊⢋⢌⢍⢎⢏⣈⣉⣊⣋⣌⣍⣎⣏" ..
-    "⢐⢑⢒⢓⢔⢕⢖⢗⣐⣑⣒⣓⣔⣕⣖⣗⢘⢙⢚⢛⢜⢝⢞⢟⣘⣙⣚⣛⣜⣝⣞⣟" ..
-    "⢠⢡⢢⢣⢤⢥⢦⢧⣠⣡⣢⣣⣤⣥⣦⣧⢨⢩⢪⢫⢬⢭⢮⢯⣨⣩⣪⣫⣬⣭⣮⣯" ..
-    "⢰⢱⢲⢳⢴⢵⢶⢷⣰⣱⣲⣳⣴⣵⣶⣷⢸⢹⢺⢻⢼⢽⢾⢿⣸⣹⣺⣻⣼⣽⣾⣿"
+  .. "⠐⠑⠒⠓⠔⠕⠖⠗⡐⡑⡒⡓⡔⡕⡖⡗⠘⠙⠚⠛⠜⠝⠞⠟⡘⡙⡚⡛⡜⡝⡞⡟"
+  .. "⠠⠡⠢⠣⠤⠥⠦⠧⡠⡡⡢⡣⡤⡥⡦⡧⠨⠩⠪⠫⠬⠭⠮⠯⡨⡩⡪⡫⡬⡭⡮⡯"
+  .. "⠰⠱⠲⠳⠴⠵⠶⠷⡰⡱⡲⡳⡴⡵⡶⡷⠸⠹⠺⠻⠼⠽⠾⠿⡸⡹⡺⡻⡼⡽⡾⡿"
+  .. "⢀⢁⢂⢃⢄⢅⢆⢇⣀⣁⣂⣃⣄⣅⣆⣇⢈⢉⢊⢋⢌⢍⢎⢏⣈⣉⣊⣋⣌⣍⣎⣏"
+  .. "⢐⢑⢒⢓⢔⢕⢖⢗⣐⣑⣒⣓⣔⣕⣖⣗⢘⢙⢚⢛⢜⢝⢞⢟⣘⣙⣚⣛⣜⣝⣞⣟"
+  .. "⢠⢡⢢⢣⢤⢥⢦⢧⣠⣡⣢⣣⣤⣥⣦⣧⢨⢩⢪⢫⢬⢭⢮⢯⣨⣩⣪⣫⣬⣭⣮⣯"
+  .. "⢰⢱⢲⢳⢴⢵⢶⢷⣰⣱⣲⣳⣴⣵⣶⣷⢸⢹⢺⢻⢼⢽⢾⢿⣸⣹⣺⣻⣼⣽⣾⣿"
 
 function M.flag_to_char(flag)
   return braille_chars:sub(flag * 3 + 1, (flag + 1) * 3)
@@ -27,16 +62,16 @@ end
 
 function M.get_top_line(window)
   if window then
-    return get_line('w0', window)
+    return get_line("w0", window)
   end
-  return get_line('w0')
+  return get_line("w0")
 end
 
 function M.get_bot_line(window)
   if window then
-    return get_line('w$', window)
+    return get_line("w$", window)
   end
-  return get_line('w$')
+  return get_line("w$")
 end
 
 function M.get_buf_height(buffer)
@@ -57,7 +92,7 @@ function M.scroll_window(window, amount)
         return
       end
       local max_move_down = math.min(amount, height - botline)
-      exe(string.format("\"normal! %d\\<C-e>\"", max_move_down))
+      exe(string.format('"normal! %d\\<C-e>"', max_move_down))
     else
       amount = -amount
       if window == nil then
@@ -68,7 +103,7 @@ function M.scroll_window(window, amount)
         return
       end
       local max_move_up = math.min(amount, topline - 1)
-      exe(string.format("\"normal! %d\\<C-y>\"", max_move_up))
+      exe(string.format('"normal! %d\\<C-y>"', max_move_up))
     end
   end)
 end

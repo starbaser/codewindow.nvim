@@ -2,12 +2,12 @@
 
 local child = MiniTest.new_child_neovim()
 
-local fixture_dir = vim.fn.fnamemodify('tests/fixtures', ':p')
+local fixture_dir = vim.fn.fnamemodify("tests/fixtures", ":p")
 
 local T = MiniTest.new_set({
   hooks = {
     pre_case = function()
-      child.restart({ '-u', 'tests/minimal_init.lua' })
+      child.restart({ "-u", "tests/minimal_init.lua" })
       child.lua('vim.env.TIKTOKEN_CACHE_DIR = "' .. fixture_dir .. '"')
       child.lua([[
         package.loaded['codewindow.config'] = nil
@@ -18,17 +18,17 @@ local T = MiniTest.new_set({
   },
 })
 
-T['compute'] = MiniTest.new_set()
+T["compute"] = MiniTest.new_set()
 
-T['compute']['returns nil for empty lines'] = function()
+T["compute"]["returns nil for empty lines"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     _G._result = hm.compute({})
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._result'), vim.NIL)
+  MiniTest.expect.equality(child.lua_get("_G._result"), vim.NIL)
 end
 
-T['compute']['returns 2D grid with correct dimensions'] = function()
+T["compute"]["returns 2D grid with correct dimensions"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local lines = {}
@@ -37,11 +37,11 @@ T['compute']['returns 2D grid with correct dimensions'] = function()
     _G._rows = #density
     _G._cols = #density[1]
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._rows'), 3) -- ceil(12/4)
-  MiniTest.expect.equality(child.lua_get('_G._cols'), 20) -- default minimap_width
+  MiniTest.expect.equality(child.lua_get("_G._rows"), 3) -- ceil(12/4)
+  MiniTest.expect.equality(child.lua_get("_G._cols"), 20) -- default minimap_width
 end
 
-T['compute']['all levels in range 0..10'] = function()
+T["compute"]["all levels in range 0..10"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local lines = {}
@@ -54,10 +54,10 @@ T['compute']['all levels in range 0..10'] = function()
       end
     end
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._in_range'), true)
+  MiniTest.expect.equality(child.lua_get("_G._in_range"), true)
 end
 
-T['compute']['sparse vs dense columns produce different densities'] = function()
+T["compute"]["sparse vs dense columns produce different densities"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     -- 4 lines: first 8 chars sparse, chars 9-16 dense
@@ -69,13 +69,13 @@ T['compute']['sparse vs dense columns produce different densities'] = function()
     _G._col1 = density[1][1]  -- sparse region
     _G._col2 = density[1][2]  -- dense region
   ]])
-  local col1 = child.lua_get('_G._col1')
-  local col2 = child.lua_get('_G._col2')
+  local col1 = child.lua_get("_G._col1")
+  local col2 = child.lua_get("_G._col2")
   -- Dense column should have higher or equal density
   MiniTest.expect.equality(col1 <= col2, true)
 end
 
-T['compute']['empty cells get density 0'] = function()
+T["compute"]["empty cells get density 0"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     -- Short lines: only first column has content, rest are empty
@@ -83,10 +83,10 @@ T['compute']['empty cells get density 0'] = function()
     local density = hm.compute(lines)
     _G._last_col = density[1][20]
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._last_col'), 0)
+  MiniTest.expect.equality(child.lua_get("_G._last_col"), 0)
 end
 
-T['compute']['uniform content has low variance'] = function()
+T["compute"]["uniform content has low variance"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local line = string.rep('abcdefgh ', 20)
@@ -104,27 +104,27 @@ T['compute']['uniform content has low variance'] = function()
     _G._spread = hi - lo
   ]])
   -- Token boundary effects may cause slight variation, but spread should be small
-  local spread = child.lua_get('_G._spread')
+  local spread = child.lua_get("_G._spread")
   MiniTest.expect.equality(spread <= 3, true)
 end
 
-T['compute']['single line returns grid'] = function()
+T["compute"]["single line returns grid"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     local density = hm.compute({ 'hello world foo bar baz qux' })
     _G._is_table = type(density[1]) == 'table'
     _G._has_cols = #density[1] == 20
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._is_table'), true)
-  MiniTest.expect.equality(child.lua_get('_G._has_cols'), true)
+  MiniTest.expect.equality(child.lua_get("_G._is_table"), true)
+  MiniTest.expect.equality(child.lua_get("_G._has_cols"), true)
 end
 
 -- Unhappy paths
 
-T['init degradation'] = MiniTest.new_set({
+T["init degradation"] = MiniTest.new_set({
   hooks = {
     pre_case = function()
-      child.restart({ '-u', 'tests/minimal_init.lua' })
+      child.restart({ "-u", "tests/minimal_init.lua" })
       child.lua([[
         package.loaded['tiktoken_core'] = nil
         package.preload['tiktoken_core'] = function()
@@ -137,27 +137,27 @@ T['init degradation'] = MiniTest.new_set({
   },
 })
 
-T['init degradation']['compute returns nil when tiktoken missing'] = function()
+T["init degradation"]["compute returns nil when tiktoken missing"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     _G._result = hm.compute({ 'hello world' })
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._result'), vim.NIL)
+  MiniTest.expect.equality(child.lua_get("_G._result"), vim.NIL)
 end
 
-T['init degradation']['repeated calls still return nil after init failure'] = function()
+T["init degradation"]["repeated calls still return nil after init failure"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     hm.compute({ 'first attempt' })
     _G._result = hm.compute({ 'second attempt' })
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._result'), vim.NIL)
+  MiniTest.expect.equality(child.lua_get("_G._result"), vim.NIL)
 end
 
-T['bad vocab'] = MiniTest.new_set({
+T["bad vocab"] = MiniTest.new_set({
   hooks = {
     pre_case = function()
-      child.restart({ '-u', 'tests/minimal_init.lua' })
+      child.restart({ "-u", "tests/minimal_init.lua" })
       child.lua([[
         vim.env.TIKTOKEN_CACHE_DIR = vim.fn.tempname()
         vim.fn.mkdir(vim.env.TIKTOKEN_CACHE_DIR, 'p')
@@ -168,12 +168,12 @@ T['bad vocab'] = MiniTest.new_set({
   },
 })
 
-T['bad vocab']['compute returns nil when vocab file missing'] = function()
+T["bad vocab"]["compute returns nil when vocab file missing"] = function()
   child.lua([[
     local hm = require('codewindow.heatmap')
     _G._result = hm.compute({ 'hello world' })
   ]])
-  MiniTest.expect.equality(child.lua_get('_G._result'), vim.NIL)
+  MiniTest.expect.equality(child.lua_get("_G._result"), vim.NIL)
 end
 
 return T

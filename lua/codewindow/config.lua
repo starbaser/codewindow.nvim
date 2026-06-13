@@ -19,6 +19,9 @@ local config = {
   screen_bounds = "lines",
   window_border = "single",
   relative = "win",
+  show_ruler = true,
+  ruler_width = 4,
+  ruler_interval = nil,
   events = { "TextChanged", "InsertLeave", "DiagnosticChanged", "FileWritePost" },
 }
 

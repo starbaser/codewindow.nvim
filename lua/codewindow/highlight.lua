@@ -24,6 +24,7 @@ function M.setup()
   api.nvim_set_hl(0, "CodewindowError", { link = "DiagnosticSignError", default = true })
   api.nvim_set_hl(0, "CodewindowAddition", { fg = "#aadb56", default = true })
   api.nvim_set_hl(0, "CodewindowDeletion", { fg = "#fc4c4c", default = true })
+  api.nvim_set_hl(0, "CodewindowRuler", { link = "LineNr", default = true })
   api.nvim_set_hl(0, "CodewindowUnderline", { underline = true, sp = "#ffffff", default = true })
   api.nvim_set_hl(0, "CodewindowBoundsBackground", { link = "CursorLine", default = true })
 
@@ -159,8 +160,15 @@ function M.apply_highlight(highlights, buffer, lines)
         for x = 1, minimap_width do
           local level = density[y][x] or 0
           if level > 0 then
-            local col_start = (x - 1) * 3 + 6
-            api.nvim_buf_add_highlight(buffer, hl_namespace, "CodewindowHeatmap" .. level, y - 1, col_start, col_start + 3)
+            local col_start = utils.minimap_col_start_byte(x)
+            api.nvim_buf_add_highlight(
+              buffer,
+              hl_namespace,
+              "CodewindowHeatmap" .. level,
+              y - 1,
+              col_start,
+              col_start + 3
+            )
           end
         end
       end
@@ -179,7 +187,14 @@ function M.apply_highlight(highlights, buffer, lines)
               end_x = end_x + 1
               highlights[y][x][pos] = ""
             end
-            api.nvim_buf_add_highlight(buffer, hl_namespace, "@" .. group, y - 1, (x - 1) * 3 + 6, end_x * 3 + 6)
+            api.nvim_buf_add_highlight(
+              buffer,
+              hl_namespace,
+              "@" .. group,
+              y - 1,
+              utils.minimap_col_start_byte(x),
+              utils.minimap_col_end_byte(end_x)
+            )
           end
         end
       end
@@ -190,7 +205,12 @@ function M.apply_highlight(highlights, buffer, lines)
     api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowError", y - 1, 0, 3)
     api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowWarn", y - 1, 3, 6)
 
-    local git_start = 6 + 3 * config.minimap_width
+    local ruler_width = utils.ruler_width()
+    if ruler_width > 0 then
+      api.nvim_buf_add_highlight(buffer, diagnostic_namespace, "CodewindowRuler", y - 1, 6, 6 + ruler_width)
+    end
+
+    local git_start = utils.git_start_byte()
     highlight_range(
       buffer,
       diagnostic_namespace,
@@ -229,8 +249,8 @@ function M.display_screen_bounds(window)
       screenbounds_namespace,
       "CodewindowUnderline",
       top_y - 1,
-      6,
-      6 + config.minimap_width * 3
+      utils.content_start_byte(),
+      utils.content_end_byte()
     )
   end
 
@@ -251,8 +271,8 @@ function M.display_screen_bounds(window)
       screenbounds_namespace,
       "CodewindowUnderline",
       bot_y,
-      6,
-      6 + config.minimap_width * 3
+      utils.content_start_byte(),
+      utils.content_end_byte()
     )
   end
 
@@ -263,8 +283,8 @@ function M.display_screen_bounds(window)
         screenbounds_namespace,
         "CodewindowBoundsBackground",
         y,
-        6,
-        6 + config.minimap_width * 3
+        utils.content_start_byte(),
+        utils.content_end_byte()
       )
     end
   end
@@ -290,11 +310,17 @@ function M.display_cursor(window)
 
   local minimap_x, minimap_y = utils.buf_to_minimap(cursor[2] + 1, cursor[1])
 
-  minimap_x = minimap_x + 2 - 1
   minimap_y = minimap_y - 1
 
   if api.nvim_buf_is_valid(window.buffer) then
-    api.nvim_buf_add_highlight(window.buffer, cursor_namespace, "Cursor", minimap_y, minimap_x * 3, minimap_x * 3 + 3)
+    api.nvim_buf_add_highlight(
+      window.buffer,
+      cursor_namespace,
+      "Cursor",
+      minimap_y,
+      utils.minimap_col_start_byte(minimap_x),
+      utils.minimap_col_end_byte(minimap_x)
+    )
   end
 end
 

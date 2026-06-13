@@ -1,10 +1,10 @@
 local M = {}
 
-local utils = require('codewindow.utils')
+local utils = require("codewindow.utils")
 local fn = vim.fn
 
 function M.parse_git_diff(lines)
-  local diff = fn.systemlist({ 'git', 'diff', '-U0', fn.expand('%') })
+  local diff = fn.systemlist({ "git", "diff", "-U0", fn.expand("%") })
 
   if vim.v.shell_error ~= 0 then
     return {}
@@ -18,8 +18,8 @@ function M.parse_git_diff(lines)
   end
 
   for _, v in ipairs(diff) do
-    if v:sub(1, 2) == '@@' then
-      local d_start, d_lines, a_start, a_lines = v:match('@@ %-(%d+),(%d+) %+(%d+),?(%d*) @@')
+    if v:sub(1, 2) == "@@" then
+      local d_start, d_lines, a_start, a_lines = v:match("@@ %-(%d+),(%d+) %+(%d+),?(%d*) @@")
 
       if a_start ~= nil then
         a_start = tonumber(a_start)

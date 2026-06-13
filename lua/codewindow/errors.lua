@@ -1,6 +1,6 @@
 local M = {}
 
-local utils = require 'codewindow.utils'
+local utils = require("codewindow.utils")
 
 local diagnostic = vim.diagnostic
 
