@@ -2,7 +2,10 @@
 
 Codewindow.nvim is a minimap plugin for neovim, that is closely integrated with treesitter and the builtin LSP to display more information to the user.
 
-![Codewindow in action](https://i.imgur.com/MokAFG0.png)
+This fork of [codewindow.nvim](https://github.com/gorbit99/codewindow.nvim) adds a
+token-density heatmap, a compact line ruler, and local Eigenvim packaging.
+
+![Codewindow in action](./assets/satty-20260613-032144.png)
 
 ## How it works
 
