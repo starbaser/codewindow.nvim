@@ -39,22 +39,54 @@ local function create_hl_namespaces(buffer)
   api.nvim_buf_clear_namespace(buffer, diagnostic_namespace, 0, -1)
 end
 
-local function most_commons(highlight)
-  local max = 0
-  for _, count in pairs(highlight) do
-    if count > max then
-      max = count
+local function best_group(votes, weight)
+  -- A glyph can use only one color; later query patterns break equal-coverage ties.
+  local best, best_count, best_pattern = nil, 0, -1
+  for group, score in pairs(votes or {}) do
+    local count = score[weight]
+    if
+      count > best_count
+      or (count == best_count and score.pattern > best_pattern)
+      or (count == best_count and score.pattern == best_pattern and (best == nil or group < best))
+    then
+      best, best_count, best_pattern = group, count, score.pattern
     end
   end
+  return best, best_pattern
+end
 
-  local result = {}
-  for entry, count in pairs(highlight) do
-    if count == max then
-      table.insert(result, entry)
+local function vote_capture(dot_votes, lines, selected, group, max_col)
+  local start_row, start_col, end_row, end_col = unpack(selected.range)
+  local width_multiplier = config.width_multiplier
+
+  for row = start_row, math.min(end_row, #lines - 1) do
+    local line = lines[row + 1]
+    -- Tree-sitter ranges are half-open, with partial columns only on the edge rows.
+    local first = row == start_row and start_col or 0
+    local last = row == end_row and end_col or #line
+    last = math.min(last, #line, max_col)
+
+    for col = first, last - 1 do
+      local chr = line:sub(col + 1, col + 1)
+      if chr ~= " " and chr ~= "\t" then
+        local minimap_x, minimap_y = utils.buf_to_minimap(col + 1, row + 1)
+        local dot_index = (row % 4) * 2 + (math.floor(col / width_multiplier) % 2) + 1
+        dot_votes[minimap_y] = dot_votes[minimap_y] or {}
+        local cells = dot_votes[minimap_y]
+        cells[minimap_x] = cells[minimap_x] or {}
+        local dots = cells[minimap_x]
+        dots[dot_index] = dots[dot_index] or {}
+        local dot = dots[dot_index]
+        local score = dot[group]
+        if score then
+          score.bytes = score.bytes + 1
+          score.pattern = math.max(score.pattern, selected.pattern)
+        else
+          dot[group] = { bytes = 1, pattern = selected.pattern }
+        end
+      end
     end
   end
-
-  return result
 end
 
 local function extract_highlighting(buffer, lines)
@@ -74,14 +106,8 @@ local function extract_highlighting(buffer, lines)
   local width_multiplier = config.width_multiplier
   local minimap_char_width = minimap_width * width_multiplier * 2
 
-  local highlights = {}
-  for _ = 1, minimap_height do
-    local line = {}
-    for _ = 1, minimap_width do
-      table.insert(line, {})
-    end
-    table.insert(highlights, line)
-  end
+  -- Score the ink represented by each braille dot, not every byte as a full glyph vote.
+  local dot_votes = {}
 
   buf_highlighter.tree:for_each_tree(function(tstree, tree)
     if not tstree then
@@ -126,31 +152,37 @@ local function extract_highlighting(buffer, lines)
     end
 
     for _, selected in pairs(captures_by_node) do
-      local start_row, start_col, end_row, end_col = unpack(selected.range)
-      start_row = start_row + 1
-      end_row = end_row + 1
-      start_col = start_col + 1
-
       for capture in pairs(selected.captures) do
         local group = query._query.captures[capture]
         if group ~= nil then
-          for y = start_row, end_row do
-            for x = start_col, math.min(end_col, minimap_char_width) do
-              local minimap_x, minimap_y = utils.buf_to_minimap(x, y)
-              if minimap_y >= 1 and minimap_y <= minimap_height and minimap_x >= 1 and minimap_x <= minimap_width then
-                highlights[minimap_y][minimap_x][group] = (highlights[minimap_y][minimap_x][group] or 0) + 1
-              end
-            end
-          end
+          vote_capture(dot_votes, lines, selected, group, minimap_char_width)
         end
       end
     end
   end, true)
 
+  local highlights = {}
   for y = 1, minimap_height do
+    local row = {}
     for x = 1, minimap_width do
-      highlights[y][x] = most_commons(highlights[y][x])
+      local groups = {}
+      local dots = dot_votes[y] and dot_votes[y][x]
+      for _, dot in pairs(dots or {}) do
+        local group, pattern = best_group(dot, "bytes")
+        if group then
+          local score = groups[group]
+          if score then
+            score.dots = score.dots + 1
+            score.pattern = math.max(score.pattern, pattern)
+          else
+            groups[group] = { dots = 1, pattern = pattern }
+          end
+        end
+      end
+      local group = best_group(groups, "dots")
+      row[x] = group and { group } or {}
     end
+    highlights[y] = row
   end
 
   return highlights
@@ -161,15 +193,6 @@ if config.use_treesitter then
   M.extract_highlighting = extract_highlighting
 else
   M.extract_highlighting = function() end
-end
-
-local function contains_group(cell, group)
-  for i, v in ipairs(cell) do
-    if v == group then
-      return i
-    end
-  end
-  return nil
 end
 
 function M.apply_highlight(highlights, buffer, lines)
@@ -201,27 +224,25 @@ function M.apply_highlight(highlights, buffer, lines)
     end
   elseif highlights ~= nil then
     for y = 1, minimap_height do
-      for x = 1, minimap_width do
-        for _, group in ipairs(highlights[y][x]) do
-          if group ~= "" then
-            local end_x = x
-            while end_x < minimap_width do
-              local pos = contains_group(highlights[y][end_x + 1], group)
-              if not pos then
-                break
-              end
-              end_x = end_x + 1
-              highlights[y][x][pos] = ""
-            end
-            api.nvim_buf_add_highlight(
-              buffer,
-              hl_namespace,
-              "@" .. group,
-              y - 1,
-              utils.minimap_col_start_byte(x),
-              utils.minimap_col_end_byte(end_x)
-            )
+      local x = 1
+      while x <= minimap_width do
+        local group = highlights[y][x][1]
+        if group and group ~= "" then
+          local end_x = x
+          while end_x < minimap_width and highlights[y][end_x + 1][1] == group do
+            end_x = end_x + 1
           end
+          api.nvim_buf_add_highlight(
+            buffer,
+            hl_namespace,
+            "@" .. group,
+            y - 1,
+            utils.minimap_col_start_byte(x),
+            utils.minimap_col_end_byte(end_x)
+          )
+          x = end_x + 1
+        else
+          x = x + 1
         end
       end
     end
