@@ -55,6 +55,108 @@ local function best_group(votes, weight)
   return best, best_pattern
 end
 
+local function isolated_group(coverage, majority_groups, y, x)
+  local groups = coverage[y][x]
+  local majority = majority_groups[y][x]
+  local isolated = {}
+
+  -- A distinct two-dot color surrounded by the same majority is more
+  -- informative than another copy of that majority in this 3x3 neighborhood.
+  for group, score in pairs(groups) do
+    if group ~= majority and score.dots >= 2 then
+      local repeated = false
+      local majority_neighbors = 0
+      for neighbor_y = math.max(1, y - 1), math.min(#coverage, y + 1) do
+        for neighbor_x = math.max(1, x - 1), math.min(#coverage[y], x + 1) do
+          if neighbor_y ~= y or neighbor_x ~= x then
+            local neighbor = coverage[neighbor_y][neighbor_x]
+            if neighbor[group] then
+              repeated = true
+              break
+            end
+            if majority_groups[neighbor_y][neighbor_x] == majority then
+              majority_neighbors = majority_neighbors + 1
+            end
+          end
+        end
+        if repeated then
+          break
+        end
+      end
+      if not repeated and majority_neighbors >= 2 then
+        isolated[group] = score
+      end
+    end
+  end
+
+  return best_group(isolated, "dots")
+end
+
+-- Each row and column sees every quartile, so a repeated 1:3 mixture forms
+-- sparse marks both horizontally and vertically instead of a solid stripe.
+local dither_thresholds = {
+  { 0, 8, 4, 12 },
+  { 14, 6, 10, 2 },
+  { 5, 13, 1, 9 },
+  { 11, 3, 15, 7 },
+}
+
+local function dither_highlights(coverage, majority_groups, mixed, height, width)
+  local highlights = {}
+  for y = 1, height do
+    local row = {}
+    highlights[y] = row
+    for x = 1, width do
+      local groups = coverage[y][x]
+      local chosen = majority_groups[y][x]
+      if mixed[y][x] then
+        local isolated = isolated_group(coverage, majority_groups, y, x)
+        if isolated then
+          chosen = isolated
+        else
+          local threshold = (dither_thresholds[(y - 1) % 4 + 1][(x - 1) % 4 + 1] + 0.5) / 16
+          local total, count, other = 0, 0, nil
+          for group, score in pairs(groups) do
+            total, count = total + score.dots, count + 1
+            if group ~= chosen then
+              other = group
+            end
+          end
+          if count == 2 then
+            if threshold >= groups[chosen].dots / total then
+              chosen = other
+            end
+          else
+            local candidates = {}
+            for group, score in pairs(groups) do
+              candidates[#candidates + 1] = { group = group, dots = score.dots, pattern = score.pattern }
+            end
+            table.sort(candidates, function(a, b)
+              if a.dots ~= b.dots then
+                return a.dots > b.dots
+              end
+              if a.pattern ~= b.pattern then
+                return a.pattern > b.pattern
+              end
+              return a.group < b.group
+            end)
+            local cumulative = 0
+            for _, candidate in ipairs(candidates) do
+              cumulative = cumulative + candidate.dots / total
+              if threshold < cumulative then
+                chosen = candidate.group
+                break
+              end
+            end
+          end
+        end
+      end
+      row[x] = chosen and { chosen } or {}
+    end
+  end
+  return highlights
+end
+
 local function vote_capture(dot_votes, lines, selected, group, max_col)
   local start_row, start_col, end_row, end_col = unpack(selected.range)
   local width_multiplier = config.width_multiplier
@@ -161,9 +263,9 @@ local function extract_highlighting(buffer, lines)
     end
   end, true)
 
-  local highlights = {}
+  local coverage, majority_groups, mixed = {}, {}, {}
   for y = 1, minimap_height do
-    local row = {}
+    local row, majority_row, mixed_row = {}, {}, {}
     for x = 1, minimap_width do
       local groups = {}
       local dots = dot_votes[y] and dot_votes[y][x]
@@ -179,13 +281,18 @@ local function extract_highlighting(buffer, lines)
           end
         end
       end
-      local group = best_group(groups, "dots")
-      row[x] = group and { group } or {}
+      row[x] = groups
+      majority_row[x] = best_group(groups, "dots")
+      local count = 0
+      for _ in pairs(groups) do
+        count = count + 1
+      end
+      mixed_row[x] = count > 1
     end
-    highlights[y] = row
+    coverage[y], majority_groups[y], mixed[y] = row, majority_row, mixed_row
   end
 
-  return highlights
+  return dither_highlights(coverage, majority_groups, mixed, minimap_height, minimap_width)
 end
 
 if config.use_treesitter then
