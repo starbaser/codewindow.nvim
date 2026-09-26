@@ -96,23 +96,49 @@ local function extract_highlighting(buffer, lines)
       return
     end
 
-    local iter = query:query():iter_captures(root, buf_highlighter.bufnr, 0, line_count + 1)
+    -- iter_matches also returns fallback captures on nodes with a later, more specific pattern.
+    local captures_by_node = {}
+    local iter = query:query():iter_matches(root, buf_highlighter.bufnr, 0, line_count + 1)
 
-    for capture, node, _ in iter do
-      local hl = query.hl_cache[capture]
-      if hl then
-        local c = query._query.captures[capture]
-        if c ~= nil then
-          local start_row, start_col, end_row, end_col = vim.treesitter.get_node_range(node)
-          start_row = start_row + 1
-          end_row = end_row + 1
-          start_col = start_col + 1
+    for pattern, match in iter do
+      for capture, nodes in pairs(match) do
+        if query.hl_cache[capture] then
+          for _, node in ipairs(nodes) do
+            local start_row, start_col, end_row, end_col = vim.treesitter.get_node_range(node)
+            local key = table.concat({ start_row, start_col, end_row, end_col }, ":")
+            local selected = captures_by_node[key]
 
+            if selected == nil or pattern > selected.pattern then
+              selected = {
+                pattern = pattern,
+                captures = {},
+                range = { start_row, start_col, end_row, end_col },
+              }
+              captures_by_node[key] = selected
+            end
+
+            if pattern == selected.pattern then
+              selected.captures[capture] = true
+            end
+          end
+        end
+      end
+    end
+
+    for _, selected in pairs(captures_by_node) do
+      local start_row, start_col, end_row, end_col = unpack(selected.range)
+      start_row = start_row + 1
+      end_row = end_row + 1
+      start_col = start_col + 1
+
+      for capture in pairs(selected.captures) do
+        local group = query._query.captures[capture]
+        if group ~= nil then
           for y = start_row, end_row do
             for x = start_col, math.min(end_col, minimap_char_width) do
               local minimap_x, minimap_y = utils.buf_to_minimap(x, y)
               if minimap_y >= 1 and minimap_y <= minimap_height and minimap_x >= 1 and minimap_x <= minimap_width then
-                highlights[minimap_y][minimap_x][c] = (highlights[minimap_y][minimap_x][c] or 0) + 1
+                highlights[minimap_y][minimap_x][group] = (highlights[minimap_y][minimap_x][group] or 0) + 1
               end
             end
           end
